@@ -1,6 +1,0 @@
-[submodule "__library/ds"]
-	path = __library/ds
-	url = https://github.com/zeroloop/ds
-[submodule "__library/debug"]
-	path = __library/debug
-	url = https://github.com/zeroloop/l-debug
