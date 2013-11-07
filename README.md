@@ -8,8 +8,10 @@ Pre Release Notes
 1. Edit settings in the index.lasso file
 2. Currently does not work as a lassoapp
 3. Currently requires a local MySQL installation (no sqlite)
-4. It has ZERO security on it — do NOT install this on anything other than a local box (!)
-5. There's a number of quirks, some of the code editor behaviour needs to be improved other things just don't work.
+4. The only security is auth_admin — only install on a local box
+5. There's a number of quirks:
+	1. Some of the code editor behaviour needs to be improved 
+	2. Other things just don't work (haven't been developed)
 
 Pre Release Goals
 -----------------
