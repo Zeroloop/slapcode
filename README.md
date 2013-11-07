@@ -6,10 +6,11 @@ Functional — but not ready for prime time.
 Pre Release Notes
 -----------------
 1. Edit settings in the index.lasso file
-2. Currently does not work as a lassoapp
-3. Currently requires a local MySQL installation (no sqlite)
-4. Currently there is * zero * security 
-5. There's a number of quirks:
+2. Export to local webroot as /slapcode
+3. Currently does not work as a lassoapp
+4. Currently requires a local MySQL installation (no sqlite)
+5. Currently there is * zero * security 
+6. There's a number of quirks:
 	1. Some of the code editor behaviour needs to be improved 
 	2. Other things just don't work (haven't been developed)
 
