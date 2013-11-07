@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>S L A P C O D E</title>
+
+<link rel="stylesheet" href="./bootstrap/css/bootstrap.css"/>
+<link rel="stylesheet" href="./codemirror/lib/codemirror.css">
+<link rel="stylesheet" href="./_css/slapcode.css">
+
+
+<script type="text/javascript" src="https://www.google.com/jsapi"></script>  
+<script type="text/javascript">
+	google.load("swfobject", "2.2")
+</script>  
+
+<script src="./_js/jquery.1.7.2.js"></script>  
+<script src="./bootstrap/js/bootstrap.js"></script>
+<script src="./_js/jquery.hotkeys.js"></script>  
+
+<script src="./codemirror/lib/codemirror.js"></script>
+
+<script src="./codemirror/mode/css/css.js"></script>
+<script src="./codemirror/mode/mysql/mysql.js"></script>
+<script src="./codemirror/mode/php/php.js"></script>
+<script src="./codemirror/mode/ruby/ruby.js"></script>
+<script src="./codemirror/mode/smalltalk/smalltalk.js"></script>
+<script src="./codemirror/mode/javascript/javascript.js"></script>
+<script src="./codemirror/mode/htmlmixed/htmlmixed.js"></script>
+
+<script src="./_js/slapcode.js"></script>
+
+</head>
+
+<body class="slapcode">
+<div class="navbar">
+<div class="navbar-inner">
+  <div class="container">
+    <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+      <span class="icon-bar"></span>
+      <span class="icon-bar"></span>
+      <span class="icon-bar"></span>
+    </a>
+    <a class="brand" href="#">S L A P C O D E</a>
+    <div class="nav-collapse">
+      <ul class="nav">
+        [if(slapcode->installed)]
+        
+        <li class="dropdown">
+          <a href="#project" class="dropdown-toggle" data-toggle="dropdown">Project</a>
+          <ul class="dropdown-menu">
+		      <li><a href="#new">New</a></li>
+		      <li class="divider"></li>
+		      <li><a href="#open">Open</a></li>
+		      <li class="divider"></li>
+		      <li><a href="#close">Close</a></li>
+          </ul>
+        </li>
+        <li class="dropdown">
+          <a href="#file" class="dropdown-toggle" data-toggle="dropdown">File</a>
+          <ul class="dropdown-menu">
+		      <li><a href="#new">New</a></li>
+		      <li class="divider"></li>
+		      <li><a href="#open">Open</a></li>
+		      <li class="divider"></li>
+		      <li><a href="#rename">Rename</a></li>
+		      <li><a href="#saveas">Save As...</a></li>
+		      <li class="divider"></li>
+		      <li><a href="#close">Close</a></li>
+          </ul>
+        </li>
+        <li class="dropdown">
+          <a href="#edit" class="dropdown-toggle" data-toggle="dropdown">Edit</a>
+          <ul class="dropdown-menu">
+		      <li><a href="#cut">Cut</a></li>
+		      <li><a href="#copy">Copy</a></li>
+		      <li><a href="#paste">Paste</a></li>
+		      <li class="divider"></li>
+		      <li><a href="#delete">Delete</a></li>
+          </ul>
+        </li>
+
+        <li class="dropdown">
+          <a href="#" class="dropdown-toggle" data-toggle="dropdown">View</a>
+          <ul class="dropdown-menu">
+		      <li><a href="#breadcrumbs">Lasso</a></li>
+		      <li class="divider"></li>
+		      <li><a href="#navbar">Mixed mode</a></li>
+		      <li><a href="#navbar">HTML / XML</a></li>
+		      <li><a href="#navs">Javascript</a></li>
+		      <li><a href="#navs">SQL</a></li>
+		      <li class="divider"></li>
+		      <li><a href="#pagination">More...</a></li>
+          </ul>
+        </li>
+		[/if]
+      </ul>
+      <ul class="nav pull-right">
+        <li><a href="#">Logout</a></li>
+        <li class="divider-vertical"></li>
+        <li class="dropdown">
+          <a href="#" class="dropdown-toggle" data-toggle="dropdown">Credits <b class="caret"></b></a>
+          <ul class="dropdown-menu">
+            <li><a href="http://codemirror.net/" target="_blank">CodeMirror</a></li>
+            <li><a href="http://twitter.github.com/bootstrap/" target="_blank">Bootstrap</a></li>
+            <li class="divider"></li>
+            <li><a href="#">www.zeroloop.com</a></li>
+          </ul>
+        </li>
+      </ul>
+    </div><!-- /.nav-collapse -->
+  </div>
+</div><!-- /navbar-inner -->
+</div>
+
+<div class="tabs">
+  <ul class="nav nav-tabs">
+  </ul>
+</div>
+
+[if(slapcode->installed)]
+	<div class="content">
+	
+		<div class="openfile">
+			[slapcode->current_editor]
+		</div>
+		
+		<div class="output">
+			<div class="result"></div>
+			[debug->ashtml]
+		</div>
+		
+	</div>
+[else]
+
+	<br/>
+	
+	<div class="install">
+
+	[if(slapcode->installation == 'No database')]
+		<h2>Database doesn't exist: [slapcode_database]</h2>
+		<p>Please create it in MySQL or set slapcode_database = 'thedatabase' in index.lasso</p>
+	[else(slapcode->installation == 'No tables')]
+		<h2>Create tables in database [slapcode_database]? <a href="#" class="btn btn-large btn-success">Create tables</a></h2>
+	[else]
+		<h2>Please check database settings in index.lasso</h2>
+	[/if]
+
+	</div>
+[/if]
+
+<div class="modal">
+  <div class="modal-header">
+    <button class="close" data-dismiss="modal">×</button>
+    <h3>Save as...</h3>
+  </div>
+  <div class="modal-body"></div>
+  <div class="modal-footer">
+    <button class="btn">Cancel</button>
+    <button class="btn btn-primary">Save changes</button>
+  </div>
+</div>
+
+</body>
+
+
+</html>
