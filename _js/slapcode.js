@@ -175,7 +175,7 @@ var slapcode = {
 		}
 		//console.log(["post",post])
 		
-		$.post('/slapcode/',post,function(r){
+		$.post('/slapcode/index.lasso',post,function(r){
 			//console.log(["result",r])
 			if(after) after(r)
 		},"json")

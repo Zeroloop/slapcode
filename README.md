@@ -1,7 +1,7 @@
 S L A P C O D E
 ===============
 Mini-IDE / play ground for Lasso 9.
-Functional, but not ready for prime time.
+Functional — but not ready for prime time.
 
 Pre Release Notes
 -----------------
@@ -20,7 +20,7 @@ Pre Release Goals
 3. Improve code editing to handle brackets etc better.
 4. Enable the history functionality
 5. Check box for auto running
-6. Allow actual files and folders to be opened and editored.
+6. Allow actual files and folders to be opened and edited.
 7. The list goes on....
 
 

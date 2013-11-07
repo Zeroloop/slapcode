@@ -1,8 +1,9 @@
 <?lasso
+
+not ::ldebug->istype	? include('__library/debug/debug.type.lasso')	
+not ::ds->istype		? include('__library/ds/_init.lasso')
+
 if(not ::slapcode_type->istype)=> {
-	not ::ldebug->istype	? include('__library/debug/debug.type.lasso')	
-	not ::ds->istype		? include('__library/ds/_init.lasso')
-	
 	include('__library/json.lasso')
 	include('__definitions/slapcode.type.lasso')
 }
