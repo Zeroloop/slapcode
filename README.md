@@ -23,11 +23,7 @@ Pre Release Goals
 6. Allow actual files and folders to be opened and edited.
 7. The list goes on....
 
+## Copyright and license
 
-
-
-
-
-
-
+Copyright 2013 Ke Carlton under [the Apache 2.0 license](LICENSE).
 
