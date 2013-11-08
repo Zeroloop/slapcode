@@ -3,6 +3,10 @@ S L A P C O D E
 Mini-IDE / play ground for Lasso 9.
 Functional — but not ready for prime time.
 
+Currently not compatible with OSX 9.2.6
+---------------------------------------
+Due to issue with 9.2.6 [see here](http://www.lassosoft.com/RhinoTrac?id=7647)
+
 Pre Release Notes
 -----------------
 1. Edit settings in the index.lasso file
@@ -16,6 +20,7 @@ Pre Release Notes
 
 Pre Release Goals
 -----------------
+0. Switch editor to ACE
 1. Implement actual native Lasso mode
 2. Allow switching between modes
 3. Improve code editing to handle brackets etc better.
