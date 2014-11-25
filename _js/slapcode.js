@@ -6,11 +6,12 @@ var slapcode = {
 			slapcode.initialised=true
 
 			//	Extend code mirror
+			/*
 			CodeMirror.wrap = function(cm,char,close){
 				var pos = cm.getCursor();
 				cm.replaceSelection(char+close)
 				cm.setSelection({line: pos.line, ch: pos.ch + 1}, {line: pos.line, ch: pos.ch + 1});
-			}
+			}*/
 			
 			$('form.code').not('registered').each(function(){
 				slapcode.registereditor($(this))
@@ -245,7 +246,7 @@ var slapcode = {
 		slapcode.tabs.push(tab)
 
 		var n = tab.name || 'Slap '+(slapcode.tabs.length)
-		var d = $('<li><a href="#tab2" data-toggle="tab"><span>'+n+'</span> <i class="icon-remove"></i></a></li>')[0]
+		var d = $('<li><a href="#tab2" data-toggle="tab"><span>'+n+'</span> <i class="icon-remove icon-white"></i></a></li>')[0]
 		
 		tab.name = n
 		
@@ -262,8 +263,6 @@ var slapcode = {
 		$(d).find('i').click(function(){
 			slapcode.closetab(tab)
 		})
-		
-		
 	
 	},
 
@@ -302,8 +301,21 @@ var slapcode = {
 
 	neweditor: function(textarea){
 		$('div.openfile').show()			
-	
-		var cm = CodeMirror.fromTextArea(textarea,{
+
+		var editor = ace.edit(textarea);
+	    editor.setTheme("ace/theme/monokai");
+		editor.getSession().setMode("ace/mode/javascript");
+		editor.getSession().setOption("useWorker", false);
+
+	    editor.on('change',function(obj,evt){
+	    		slapcode.tab.code = editor.getValue()
+				slapcode.autocompile()
+				slapcode.autosubmit()
+	    })
+
+
+		/*
+		CodeMirror.fromTextArea(textarea,{
 					lineNumbers: true,
 					lineWrapping: true,
 					matchBrackets: true,
@@ -334,14 +346,12 @@ var slapcode = {
 						}
 					}
 				})
-		cm.breaks = []
-				
-		var modes = CodeMirror.listModes()
 
-		for(i=0;i < modes.length;i++){
-			//console.log(modes[i])
-		}
-		return cm
+		cm.breaks = []
+		*/
+
+				
+		return editor
 			
 	},
 	
@@ -350,12 +360,14 @@ var slapcode = {
 			$(element).addClass('registered')	
 			
 			slapcode.host = element
-			slapcode.editor = slapcode.neweditor(element.find('textarea')[0])
+			slapcode.editor = slapcode.neweditor(element.find('.editor')[0])
 	
 			element.find('button:contains("Run")').unbind().click(function(){
 				slapcode.submit(false)
 				return false
 			})
+
+			slapcode.editor.focus()
 			element.submit(slapcode.submit)
 		}
 	},
@@ -368,15 +380,23 @@ var slapcode = {
 		
 		p={line:line-1, ch:char-1};
 		
-		if(focus && false){
-			e.setCursor(p); 
-			e.focus();
-		}
-		e.addWidget(p,h.find('div.feedback').html(msg).show()[0],true);
+		// Add / show floating error
+		var pos = e.renderer.textToScreenCoordinates(p.line,p.ch)
+		h.find('div.feedback').html(msg).css('left',pos.pageX + 'px').css('top',pos.pageY + 'px').show()
+
+		e.getSession().setAnnotations([{
+		  row:    p.line,
+		  column: p.ch,
+		  text:   msg,
+		  type:   "error" // also warning and information
+		}]);
+
+
 		//e.setLineClass(4-1,'test1','test2')
 	},
 
 	hideerror: function(){
+		slapcode.tab.editor.getSession().setAnnotations([])
 		slapcode.host.find('div.feedback').hide()
 	},
 

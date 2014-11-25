@@ -65,10 +65,10 @@ div.install a{
 
 
 div.content{
-	max-width:1220px;
 	margin:auto;
-	padding:100px 8px 20px 8px;
+	padding:74px 0 20px 0;
 	overflow-x: hidden;
+	height: 100%;
 	
 }
 
@@ -80,6 +80,7 @@ div.openfile{
 	margin-right:20px;
 	position:relative;
 	display: none;
+	height: 100%
 }
 div.openfile:hover{}
 
@@ -127,8 +128,6 @@ div.output div.result.pulse{
 }
 
 
-
-
 div.output div.result,
 div.output div.debug{
 	border: 1px dotted #CCC;
@@ -166,6 +165,16 @@ div.openfile .CodeMirror-scroll{
 	overflow: visible;
 }
 
+form.code{
+	height: 100%;
+}
+
+form.code .editor{
+	width:100%;
+	height: 100%;
+}
+
+
 form.code div.feedback{
 	position: absolute;
 	display:none;
@@ -193,4 +202,64 @@ form.code div.feedback:before{
 	overflow: hidden;
 	border-left: 5px solid transparent;
 	border-right: 5px solid transparent;
-	border-bottom: 5px solid black;}
+	border-bottom: 5px solid black;
+}
+
+
+
+
+/* DARK STYLE */
+ 
+body{
+	background-color: #323131;
+}
+
+.nav-tabs {
+	border-bottom: 1px solid #333;
+}
+
+.nav-tabs > li > a:hover {
+	color: #555555;
+	background-color: #333;
+	border: 1px solid #111;
+
+	border-bottom-color: transparent;
+}
+
+
+.nav-tabs > .active > a, 
+.nav-tabs > .active > a:hover {
+	color: #555555;
+	background-color: #2F3129;
+	border: 1px solid #000;
+	border-bottom-color: transparent;
+}
+
+.slapcode > div.tabs .nav{
+	background: #222121
+}
+
+form.code div.feedback {
+	position: absolute;
+	display: none;
+	z-index: 1;
+	max-width: 500px;
+	margin-top: -52px;
+	margin-left: -4px;
+	margin-left: 2px;
+	padding: 4px 6px;
+	background: rgba(32, 28, 28, 0.94);
+	border: 1px solid rgba(255, 255, 255, 0.23);
+	border-radius: 2px;
+	font-size: 11px;
+	font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+	color: #737070;
+	z-index: 999;
+	text-shadow: none;
+	box-shadow: none;
+}
+
+form.code div.feedback:before{	
+	border-bottom: 5px solid rgb(128, 113, 113)
+}
+

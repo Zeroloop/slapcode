@@ -4,7 +4,6 @@
 <title>S L A P C O D E</title>
 
 <link rel="stylesheet" href="./bootstrap/css/bootstrap.css"/>
-<link rel="stylesheet" href="./codemirror/lib/codemirror.css">
 <link rel="stylesheet" href="./_css/slapcode.css">
 
 
@@ -16,16 +15,7 @@
 <script src="./_js/jquery.1.7.2.js"></script>  
 <script src="./bootstrap/js/bootstrap.js"></script>
 <script src="./_js/jquery.hotkeys.js"></script>  
-
-<script src="./codemirror/lib/codemirror.js"></script>
-
-<script src="./codemirror/mode/css/css.js"></script>
-<script src="./codemirror/mode/mysql/mysql.js"></script>
-<script src="./codemirror/mode/php/php.js"></script>
-<script src="./codemirror/mode/ruby/ruby.js"></script>
-<script src="./codemirror/mode/smalltalk/smalltalk.js"></script>
-<script src="./codemirror/mode/javascript/javascript.js"></script>
-<script src="./codemirror/mode/htmlmixed/htmlmixed.js"></script>
+<script src="./ace/ace.js" type="text/javascript" charset="utf-8"></script>
 
 <script src="./_js/slapcode.js"></script>
 
@@ -120,7 +110,7 @@
 [if(slapcode->installed)]
 	<div class="content">
 	
-		<div class="openfile">
+		<div class="openfile" style="display:block;">
 			[slapcode->current_editor]
 		</div>
 		
