@@ -102,9 +102,9 @@ var slapcode = {
 	bindeditorkeys: function(editor){
 		editor.commands.bindKey("cmd-return", slapcode.submit)
 		editor.commands.bindKey("ctrl-r",slapcode.file_rename)
-		editor.commands.bindKey("ctrl_s",slapcode.file_save)
-		editor.commands.bindKey("ctrl_n",slapcode.file_new)
-		editor.commands.bindKey("ctrl_w",slapcode.file_close)
+		editor.commands.bindKey("ctrl-s",slapcode.file_save)
+		editor.commands.bindKey("ctrl-n",slapcode.file_new)
+		editor.commands.bindKey("ctrl-w",slapcode.file_close)	
 	},
 
 
@@ -328,7 +328,7 @@ var slapcode = {
 	    })
 
 		editor.renderer.setScrollMargin(84,0,0,0)  
-		
+
 		/*
 		CodeMirror.fromTextArea(textarea,{
 					lineNumbers: true,
