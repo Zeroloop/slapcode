@@ -192,7 +192,7 @@ define slapcode_type => type {
 				.run(#code)
 				
 				#out->insert(
-					'id' = .save(#id,#name,#code)
+					'id' = .save(#id,#name,#code)->keyvalue 
 				)
 				
 				return .current_result
@@ -219,7 +219,7 @@ define slapcode_type => type {
 		
 		if(client_headers >> 'json') => {
 			content_type('application/json; charset=UTF-8')
-			return json_serialize(#out)
+			return json_serialize(#out || null)
 		else
 			return #out->values->join('')
 		}
@@ -505,40 +505,48 @@ define slapcode_type => type {
 		name::string,
 		code::string
 	) => {
-		
-		return
-				
+
 		local(
-			row = activerow(.ds->table(::code)),
-			out = .output,
-			p_id = .project_id,
-			u_id = !#p_id ? .user_id | 0,
-			now = date->format('%q'),
-			data =  map(
-						'id'		= #id,
-						'project_id'= #p_id,
-						'user_id' 	= #u_id,
-						'name' 		= #name,
-						'code' 		= #code,
-						'created' 	= #now,
-						'modified' 	= #now,
-						'isopen'	= 1
-					)
+			row  = activerow(.ds->table(::code))->getrow(::name = #name),
+			now  = date->format('%q')
 		)
-		#id ? #data->remove('created')
+
+		debug('save id' = #id)
+		debug('name id' = #name)
+		debug('isnew' = #row->isnew)
+		// Add created date if new
+		! #id ? #row->updatedata('created' = #now)
+
+		protect => {
+
+			handle => {
+				debug('id'        = #id)
+				debug('name'      = #name)
+				debug('error_msg' = error_msg)
+			}
+
+			return #row->save(
+				'project_id'= .project_id,
+				'user_id' 	= .user_id,
+				'name' 		= #name,
+				'code' 		= #code,
+				'modified' 	= #now,
+				'isopen'	= 1
+			)
 		
-		#row->updatedata(#data) & save		
-			
-		//return .insert('code',#row,#id)
+
+		}
+
+
 	}
 
 	public insert(table::string,row::map,id::any) => {
 		#row->insert('id'=#id)		
-		.ds->insertinto(#table,#row,true) => {}	
+		.ds->addrow(#table,#row,true) => {}	
 	}
 	
 	public update(table::string,row::map,id::integer) => {
-		ds->updaterowin(#table,#row,#id)
+		.ds->updaterow(#table,#row,#id)
 	}
 	
 	public log(

@@ -21,10 +21,12 @@ var slapcode = {
 			$('div.navbar ul.nav').children('li').each(function(){
 				var p = $(this).children('a').attr('href')
 				$(this).children('ul').find('a').unbind().click(function(){
-					slapcode.click(p+$(this).attr('href'))
-					return false			
+					var url = $(this).attr('href')
+					return url.indexOf("#") == -1 || slapcode.click(p + url) 
 				})
 			})
+			
+
 			
 			// Bind run
 			/*
@@ -39,7 +41,6 @@ var slapcode = {
 			})	
 			
 			slapcode.bindkeys(document)
-			
 			slapcode.load()			
 		}
 	},
@@ -89,15 +90,23 @@ var slapcode = {
 		})
 	},
 	
-	
-	
 	bindkeys: function(target){
-		$(target).bind('keydown.ctrl_r',function(e){return slapcode.submit()})
-		$(target).bind('keydown.ctrl_s',function(e){return slapcode.click('#file#save',e)})
-		$(target).bind('keydown.ctrl_n',function(e){return slapcode.click('#file#new',e)})
-		$(target).bind('keydown.ctrl_t',function(e){return slapcode.click('#file#new',e)})
-		$(target).bind('keydown.ctrl_w',function(e){return slapcode.click('#file#close',e)})	
+		$(target).bind('keydown.meta_return',slapcode.submit)
+		$(target).bind('keydown.ctrl_r',slapcode.file_rename)
+		$(target).bind('keydown.ctrl_s',slapcode.file_save)
+		$(target).bind('keydown.ctrl_n',slapcode.file_new)
+		$(target).bind('keydown.ctrl_t',slapcode.file_new)
+		$(target).bind('keydown.ctrl_w',slapcode.file_close)	
 	},
+
+	bindeditorkeys: function(editor){
+		editor.commands.bindKey("cmd-return", slapcode.submit)
+		editor.commands.bindKey("ctrl-r",slapcode.file_rename)
+		editor.commands.bindKey("ctrl_s",slapcode.file_save)
+		editor.commands.bindKey("ctrl_n",slapcode.file_new)
+		editor.commands.bindKey("ctrl_w",slapcode.file_close)
+	},
+
 
 	process: function(r){
 		var output=$('div.output')
@@ -254,6 +263,10 @@ var slapcode = {
 			slapcode.switchtab(tab)
 		})
 
+		$(d).find('a').dblclick(function(){
+			slapcode.file_rename(tab)
+		})
+
 		$('div.tabs ul.nav').append($(d))
 		
 		if(!dontclick) $('div.tabs ul.nav li:last a').click()
@@ -302,10 +315,11 @@ var slapcode = {
 	neweditor: function(textarea){
 		$('div.openfile').show()			
 
-		var editor = ace.edit(textarea);
-	    editor.setTheme("ace/theme/monokai");
-		editor.getSession().setMode("ace/mode/javascript");
-		editor.getSession().setOption("useWorker", false);
+		var editor = ace.edit(textarea)
+	    editor.setTheme("ace/theme/monokai")
+		editor.getSession().setMode("ace/mode/javascript")
+		editor.getSession().setOption("useWorker", false)
+		slapcode.bindeditorkeys(editor)
 
 	    editor.on('change',function(obj,evt){
 	    		slapcode.tab.code = editor.getValue()
@@ -314,7 +328,7 @@ var slapcode = {
 	    })
 
 		editor.renderer.setScrollMargin(84,0,0,0)  
-
+		
 		/*
 		CodeMirror.fromTextArea(textarea,{
 					lineNumbers: true,
@@ -362,6 +376,7 @@ var slapcode = {
 			
 			slapcode.host = element
 			slapcode.editor = slapcode.neweditor(element.find('.editor')[0])
+
 	
 			element.find('button:contains("Run")').unbind().click(function(){
 				slapcode.submit(false)
@@ -369,6 +384,7 @@ var slapcode = {
 			})
 
 			slapcode.editor.focus()
+
 			element.submit(slapcode.submit)
 		}
 	},
@@ -383,7 +399,7 @@ var slapcode = {
 		
 		// Add / show floating error
 		var pos = e.renderer.textToScreenCoordinates(p.line,p.ch)
-		h.find('div.feedback').html(msg).css('left',pos.pageX + 'px').css('top',(pos.pageY + 74) + 'px').show()
+		h.find('div.feedback').html(msg).css('left',pos.pageX + 'px').css('top',pos.pageY + 'px').show()
 
 		e.getSession().setAnnotations([{
 		  row:    p.line,
@@ -416,7 +432,7 @@ var slapcode = {
 
 		if(e) e.preventDefault()
 		
-		return false		
+		return false	
 	},
 
 	prompt_with_input: function(title,value,placeholder,after){
@@ -482,8 +498,8 @@ var slapcode = {
 			}else{
 				ul.append(
 					'<li><a href="#project#openthis#'+p.id+'">'+p.name+'</a></li>'
-				)			
-			
+				)	
+
 			}
 			
 		} 
