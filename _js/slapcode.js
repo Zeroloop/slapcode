@@ -313,6 +313,7 @@ var slapcode = {
 				slapcode.autosubmit()
 	    })
 
+		editor.renderer.setScrollMargin(84,0,0,0) 
 
 		/*
 		CodeMirror.fromTextArea(textarea,{
@@ -382,7 +383,7 @@ var slapcode = {
 		
 		// Add / show floating error
 		var pos = e.renderer.textToScreenCoordinates(p.line,p.ch)
-		h.find('div.feedback').html(msg).css('left',pos.pageX + 'px').css('top',pos.pageY + 'px').show()
+		h.find('div.feedback').html(msg).css('left',pos.pageX + 'px').css('top',(pos.pageY + 74) + 'px').show()
 
 		e.getSession().setAnnotations([{
 		  row:    p.line,

@@ -3,9 +3,11 @@ S L A P C O D E
 Mini-IDE / play ground for Lasso 9.
 Functional — but not ready for prime time.
 
+Compatible with 9.2.5, 9.2.7 and 9.3.
+
 Currently not compatible with OSX 9.2.6
 ---------------------------------------
-Due to issue with 9.2.6 [see here](http://www.lassosoft.com/RhinoTrac?id=7647) — 9.2.5 / 9.2.7 / 9.3 are OK.
+Due to issue with 9.2.6 [see here](http://www.lassosoft.com/RhinoTrac?id=7647)
 
 Pre Release Notes
 -----------------
@@ -31,4 +33,3 @@ Pre Release Goals
 ## Copyright and license
 
 Copyright 2013 Ke Carlton under [the Apache 2.0 license](LICENSE).
-
