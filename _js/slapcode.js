@@ -313,7 +313,7 @@ var slapcode = {
 				slapcode.autosubmit()
 	    })
 
-		editor.renderer.setScrollMargin(84,0,0,0) 
+		editor.renderer.setScrollMargin(84,0,0,0)  
 
 		/*
 		CodeMirror.fromTextArea(textarea,{
