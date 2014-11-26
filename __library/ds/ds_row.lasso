@@ -30,7 +30,6 @@ define ds_row => type{
 		| return 'id'
 	}
 	
-	// always return untouched value
 	public keyvalue => .raw(.keycolumn) 
 	
 	public keyvalue=(p::any)  	=> {
@@ -45,7 +44,7 @@ define ds_row => type{
 		)
 		.'dsinfo'->keycolumns->foreach => {
 			#col = #1->get(1)
-			#out->insert((:#col,#1->get(2),.find(#col)))
+			#out->insert((:#col,#1->get(2),.raw(#col->asstring)))
 		}
 		return #out->asstaticarray
 	}
@@ -113,14 +112,16 @@ define ds_row => type{
 	//	Map behaviour
 	public find(col::string) => {
 		.'modified_data'->size ? {#1->isnota(::void) ? return #1}(.'modified_data'->find(#col))
-		local(i) = .'index'->find(#col)
-		#i ? return .'row'->get(#i)
+		return .raw(#col)
 	}
 	public find(col::tag) => {
 		return .find(#col->asstring)
 	}	
 	public find=(val,col::string) => {
 		.'modified_data'->insert(#col=#val)
+	}
+	public find=(val,col::tag) => {
+		.'modified_data'->insert(#col->asstring = #val)
 	}
 	public insert(pair::pair) => {
 		.'modified_data'->insert(#pair)
@@ -132,9 +133,16 @@ define ds_row => type{
 //
 //---------------------------------------------------------------------------------------
 
-	public updatedata(pair::pair,...) => .updatedata(tie(staticarray(#pair),#rest || staticarray)->asstaticarray)
+	public invoke=(val,col::tag) 	=> .insert(#col = #val)
+	public invoke=(val,col::string) => .insert(#col = #val)
+
 	public updatedata(data::trait_keyedForEach) => .updatedata(#data->eachPair->asstaticarray)
-	public updatedata(values::staticarray) => {
+
+	public updatedata(p::pair,...) => {	
+		.insert(#p)
+		#rest ? #rest->foreach => { .updatedata(#1) } 
+	}
+	public updatedata(values::trait_positionallyKeyed) => {
 		#values->foreach => {
 			#1->isa(::pair) ? .insert(#1) 
 		}
@@ -146,26 +154,41 @@ define ds_row => type{
 //
 //---------------------------------------------------------------------------------------
 
-	public invoke=(val,col::tag) 	=> .update(#col = #val)
-	public invoke=(val,col::string) => .update(#col = #val)
-
 	public set(pair::pair) 			=> .update(#pair)
 	public set=(val,col::tag) 		=> .update(#col = #val)
 	public set=(val,col::string) 	=> .update(#col = #val)
 	
-	public update(pair::pair,...) => .update(tie(staticarray(#pair),#rest || staticarray)->asstaticarray)
 	public update(data::trait_keyedForEach) => .update(#data->eachPair->asstaticarray)
-	public update(values::staticarray) => {
+
+	public update(p::pair,...) => {	
+		.updatedata(:params)
+		.update
+	}
+	public update(values::trait_positionallyKeyed) => {
 		.updatedata(#values)
 		.update
 	}
 	public update => {
-		//!debug('ds_update' = .modified_data)
-		.modified_data->size
-		? .ds->update(self)
-		
-		//	? .ds->execute(::update,.table->asstring,.keyvalues,.modified_data->eachpair->asstaticarray)
-	
+		if(.modified_data->size) => {
+			.ds->update(self)
+			.storeModified
+		}		
+	}
+
+	// Clear out the modified_data store
+	public storemodified => {
+		.modified_data->forEachNode2 => {
+			local(
+				key   = #1->key,
+				value = #1->value,
+				index = .index->find(#key)
+			)
+
+			// Update data if item is there
+			#index ? .row->get(#index) = #value
+		}
+
+		.modified_data = map
 	}
 
 //---------------------------------------------------------------------------------------
@@ -187,7 +210,7 @@ define ds_row => type{
 			map 		= map,
 			modified 	= .modified_data,
 			cols 		= .'cols',
-			row 		= .'row',
+			row 		= .'row'
 		)
 
 		//	Build map
@@ -222,4 +245,13 @@ define ds_row => type{
 	}
 	
 }
+
+// Work around for older versions of 9.2
+// map->forEachNode should be public in 9.2.7
+protect => {\map}
+define map->forEachNode2 => .forEachNode => givenBlock
+
+define json_serialize(p::ds_row) => json_serialize(#p->asmap)
+
+
 ?>

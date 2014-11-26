@@ -32,6 +32,7 @@ define ds_result => type {
 	data 
 		public index::trait_searchable,
 		public cols::trait_foreach,
+		public types::trait_foreach,
 		public rows::staticarray,
 		public set::staticarray,
 		public found::integer=0,
@@ -164,11 +165,45 @@ define ds_result => type {
 
 	public columns => .cols->asstaticarray
 	public found_count => .found 
-	
+
+	public columntype(i::integer)::tag => {
+		match(#i) => {
+			case(lcapi_datasourcetypestring)
+				return ::string
+			case(lcapi_datasourcetypeinteger)
+				return ::integer
+			case(lcapi_datasourcetypeboolean)
+				return ::boolean
+			case(lcapi_datasourcetypeblob)
+				return ::bytes
+			case(lcapi_datasourcetypedecimal)
+				return ::decimal
+			case(lcapi_datasourcetypedate)
+				return ::date
+			case
+				return
+		}
+	}
+
+	public columntypes => {
+		.'types' ? return .'types'
+ 
+		local(types) = map
+
+		.'set'->get(INLINE_COLUMNINFO_POS)->foreach => {
+			#types->insert(
+				#1->get(INLINE_COLINFO_NAME_POS) = .columntype(
+					#1->get(INLINE_COLINFO_TYPE_POS)
+				)
+			)
+		}
+
+		return .'types' := #types 
+	}
+
 	public rows => {
 		
 		local(
-			gb = givenblock,
 			rows = .'dsrows'
 		)
 		
@@ -180,38 +215,51 @@ define ds_result => type {
 				)
 			}
 		}
-		
-		if(#gb) => {
-			result_push(self)
-			#rows->foreach => {
-				#gb(#1)
-			}
-			result_pop
-		}
 
-		return .'dsrows' := #rows		
+		.'dsrows' = #rows
+		
+		.gb(#rows) => givenblock
+
+		return #rows		
 	}	
 
 	public rows(type::tag) => {
 		local(
-			gb = givenblock,
 			out = array,
-			row
-		) 
-		
+			base = #type->gettype,
+			row   
+		)
 		.rows->foreach => {
-			#row = \#type()
-			#row->oncreate(#1)
+			#row = #base->ascopy 
+			#row->oncreate(#1)		
 			#out->insert(#row)
+		}		
+		.gb(#out) => givenblock		
+		return #out
+	}
+
+	public rows(creator::memberstream) => {
+		local(
+			out = array 
+		)
+		.rows->foreach => {
+			#out->insert(
+				#creator(#1)
+			)
 		}
+		.gb(#out) => givenblock		
+		return #out
+	}
+	
+	private gb(rows::array) => {
+		local(gb) = givenblock
 		if(#gb) => {
 			result_push(self)
-			#out->foreach => {
+			#rows->foreach => {
 				#gb(#1)	
 			}
 			result_pop
-		}		
-		return #out
+		}	
 	}
 
 	public row(row::integer) => {

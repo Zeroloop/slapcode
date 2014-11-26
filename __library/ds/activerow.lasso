@@ -6,7 +6,7 @@
 //..All rights reserved — K Carlton 2013.................................................
 
 define activerow_pluralise_tables => true
-define activerow_default_timestamp_format => 'YYYY-mm-dd HH-MM-SS'
+define activerow_default_timestamp_format => 'yyyy-MM-dd HH:mm:ss'
 define activerow_default_created_column => ''
 define activerow_default_modified_column => ''
 	
@@ -31,34 +31,80 @@ define activerow => type {
 //---------------------------------------------------------------------------------------
 
 	public oncreate => {}
+
+	public oncreate(p::void) => {}
+
 	public oncreate(row::ds_row) => {
 		.row = #row
 		return self
 	}
-	public oncreate(ds::ds) => {
-//!		debug('oncreate ds')
-		.'ds' = #ds
-		return self
-	}
 
 	public oncreate(keyvalue::string) => {
-		.row = .ds->getrow(#keyvalue)
-//!		debug('oncreate keyvalue::string' = .isnew)
+		.getrow(#keyvalue)
 		return self
 	}
 
 	public oncreate(keyvalue::integer) => {
-		.row = .ds->getrow(.table,#keyvalue) 
-//!		debug('oncreate keyvalue::integer' = .isnew)
+		.getrow(#keyvalue)
 		return self
 	}
 
 	public oncreate(key::pair,...) => {
-		.row = .ds->getrow(.table,#key)
-		.updatedata(params)
-//!		debug('oncreate keyvalue::integer' = .isnew)
+		.getrow(:params)
 		return self
 	}
+
+	public oncreate(ds::ds,...keyvalues) => {
+		.ds = #ds
+		#keyvalues ? .getrow(:#keyvalues)
+		return self
+	}
+
+	public oncreate(databasetable::tag,...keyvalues) => {
+		local(s) = #databasetable->asstring->splitextension('.')
+
+		if(#s->value) => {
+			// Set a new ds connection
+			.ds = ds(#databasetable)
+			#keyvalues ? .getrow(:#keyvalues)
+			return self
+		else
+			// Force a ::database.table signature
+			fail(-1,'Table not specified, format is active_row(::database.table)')
+		}
+	}
+
+	// getrow should be perhaps renamed here
+
+	public getrow(key::pair,...) => {
+		.row = .ds->getrow(:params)
+		.updatedata(:params)
+		return self
+	}
+
+	public getrow(keyvalues::staticarray) => {
+		.row = .ds->getrow(:#keyvalues)
+		.updatedata(:#keyvalues)		
+	}
+
+	public getrow(keyvalue::string) => {
+		if(#keyvalue) => {
+			.row = .ds->getrow(#keyvalue)
+			.updatedata(.keycolumn = #keyvalue)
+		}
+		return self
+	}
+
+	public getrow(keyvalue::integer) => {
+		if(#keyvalue) => {
+			.row = .ds->getrow(#keyvalue)
+			.updatedata(.keycolumn = #keyvalue)
+		}
+		return self
+	}
+
+	// support blindly relayed params
+	public getrow(key::void) => {}
 	
 //---------------------------------------------------------------------------------------
 //
@@ -147,12 +193,13 @@ define activerow => type {
 //
 //---------------------------------------------------------------------------------------
 
-	public updatedata(pair::pair,...) => .updatedata(
-		tie(staticarray(#pair),#rest || staticarray)->asstaticarray
-	)
 	public updatedata(data::trait_keyedForEach) => .updatedata(#data->eachPair->asstaticarray)
-	public updatedata(data::staticarray) => {	
-		local(row) = .row		
+	public updatedata(p::pair,...) => {	
+		.row->insert(#p)
+		#rest ? #rest->foreach => { .updatedata(#1) } 
+	}
+	public updatedata(data::trait_positionallyKeyed) => {	
+		local(row) = .row			
 		#data->foreach => {
 			#1->isa(::pair) ? #row->insert(#1) 
 		}
@@ -164,16 +211,17 @@ define activerow => type {
 //
 //---------------------------------------------------------------------------------------
 
-	public invoke=(val,col::tag) 	=> .update(#col = #val)
-	public invoke=(val,col::string) => .update(#col = #val)
-
 	public set(pair::pair) 			=> .update(#pair)
 	public set=(val,col::tag) 		=> .update(#col = #val)
 	public set=(val,col::string) 	=> .update(#col = #val)
 	
-	public update(pair::pair,...) => .update(params)
 	public update(data::trait_keyedforeach) => .update(#data->eachpair->asstaticarray)
-	public update(values::staticarray) => {
+
+	public update(pair::pair,...) => {
+		.updatedata(:params)
+		.update
+	}
+	public update(values::trait_positionallyKeyed) => {
 		.updatedata(#values)
 		.update 
 	}
@@ -207,14 +255,18 @@ define activerow => type {
 //---------------------------------------------------------------------------------------
 
 	public create => {
-		local(row) = .row
+		local(
+			row = .row,
+			key 
+		)
 		
 		//	Should we create a row when no data? — it should probably cause an error
-		//	Inline just fails at the data source
 
 		.generate_uuid ? #row->insert(
 			.keycolumn = lasso_uniqueid
 		)
+
+		#key = .find(.keycolumn)
 
 		// Add timestamp when column specified
 		.created_column ? #row->insert(
@@ -227,12 +279,19 @@ define activerow => type {
 		)
 		
 		//	Allow for empty rows insert would normally fail if no data supplied 
-		'mysqlds,sqliteds' >> .ds->datasource && not .find(.keycolumn) 
+		'mysqlds,sqliteds' >> .ds->datasource && not #key && ! #row->modified_data->size 
 		? #row->insert(
 			#row->keycolumn = null
-		)
+		)		
+
 		#row = .ds->addrow(.table,#row->modified_data)
-		#row ? .'row' := #row | fail('Unable to create row')
+
+		// If keyvalue is forced we must load the row
+		if(!#row && #key && ! .keyvalue) => {
+			#row = .ds->getfrom(.table,.keycolumn = #key)->first
+		}
+
+		#row ? .'row' := #row | fail('Unable to create row (ensure correct ->keycolumn(\'name\') is specified)')
 	}
 		
 //---------------------------------------------------------------------------------------
@@ -242,7 +301,7 @@ define activerow => type {
 //---------------------------------------------------------------------------------------
 
 	public save(pair::pair,...) => {
-		.updatedata(params)
+		.updatedata(:params)
 		return .save
 	}
 
@@ -263,19 +322,32 @@ define activerow => type {
 //
 //---------------------------------------------------------------------------------------
 
-	public invoke(col::tag) 		=> .'row'->find(#col->asstring)
-	public invoke(col::string) 		=> .'row'->find(#col)
-	public invoke=(val,col::tag) 	=> { .'row'->find(#col->asstring) = #val }
-	public invoke=(val,col::string) => { .'row'->find(#col) = #val }
+	public invoke(col::tag) 		=> .row->find(#col->asstring)
+	public invoke(col::string) 		=> .row->find(#col)
+	public invoke=(val,col::tag) 	=> { .row->find(#col->asstring) = #val }
+	public invoke=(val,col::string) => { .row->find(#col) = #val }
 	
-	
-	public find(col::tag) 			=> .'row'->find(#col->asstring)
-	public find(col::string) 		=> .'row'->find(#col)
-	public find=(val,col::tag) 		=> { .'row'->find(#col->asstring) = #val }
-	public find=(val,col::string) 	=> { .'row'->find(#col) = #val }
+	public find(col::tag) 			=> .row->find(#col->asstring)
+	public find(col::string) 		=> .row->find(#col)
+	public find=(val,col::tag) 		=> { .row->find(#col->asstring) = #val }
+	public find=(val,col::string) 	=> { .row->find(#col) = #val }
 
+	//	Unmodified values
+	public raw(col::string) => .row->raw(#col)
+	public raw(col::tag) => .row->raw(#col->asstring)
+
+//---------------------------------------------------------------------------------------
+//
+// 	Retun self as map or array (includes modified data)
+//
+//---------------------------------------------------------------------------------------
+	
+	public asmap => .row->asmap
+	public asarray => .row->asarray
 
 }
+
+define json_serialize(p::activerow) => json_serialize(#p->asmap)
 
 
 ?>

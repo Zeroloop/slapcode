@@ -12,18 +12,21 @@
 //---------------------------------------------------------------------------------------
 
 define ds_connections => {
-	if(var(::__ds_connections__)->isnota(::map)) => {
-		$__ds_connections__ = map
+	if(var(__ds__connections__)->isnota(::map)) => {
+		$__ds__connections__ = map
+
 		web_request ? define_atend({
 			ds_connections->foreach => {				
 				//stdout(#1->key+': ')
 				#1->close
 				//stdoutnl('closed')	
 			}
-		})
+		}) 
 	} 
-	return $__ds_connections__
+	return $__ds__connections__
 }
+
+define ds_close_connections => ds_connections->foreach => {#1->close}
 
 //---------------------------------------------------------------------------------------
 //
@@ -33,11 +36,27 @@ define ds_connections => {
 
 define datasource(...) => ds(:#rest || staticarray)
 
+//---------------------------------------------------------------------------------------
+//
+// 	ds — defaults
+//
+//---------------------------------------------------------------------------------------
+
+define ds_default_silent => false
+define ds_default_maxrows => 50
+
+//---------------------------------------------------------------------------------------
+//
+// 	ds — main type
+//
+//---------------------------------------------------------------------------------------
+
 define ds => type{
 
 	data
 		public	dsinfo::dsinfo,
 		public	key::string = '',
+		public	silent::boolean,
 		private	keycolumn::string = 'id',	
 		private results = staticarray,
 
@@ -52,13 +71,15 @@ define ds => type{
 		local(ds) = ds
 		
 		#ds->dsinfo = .dsinfo->makeinheritedcopy
-		#ds->key = .key
-		#ds->capi = .capi
+		#ds->key    = .key
+		#ds->capi   = .capi
 		
 		return #ds
 	
 	}
 	public ascopydeep 	=> .ascopy
+
+	public silent => (.'silent'->isnota(::void) ? .'silent' | ds_default_silent)
 
 //---------------------------------------------------------------------------------------
 //
@@ -158,7 +179,7 @@ define ds => type{
 			-password 	= #dsinfo->hostpassword,
 			-port 		= integer(#dsinfo->hostport),	
 			-encoding	= #dsinfo->hosttableencoding || 'UTF-8',
-			-maxrows	= #dsinfo->maxrows || 50,
+			-maxrows	= #dsinfo->maxrows || ds_default_maxrows,
 			-dsinfo		= #dsinfo,	//	Legacy: leverage dsinfo constructor
 			-useinfo	= #useinfo	//	Legacy: switch to trigger legacy mode
 		) => givenblock 
@@ -176,7 +197,7 @@ define ds => type{
 		-database::string='',
 		-table::string='',
 		-keycolumn::string='',
-		-maxrows::integer=50,
+		-maxrows::integer=ds_default_maxrows,
 		
 		// Host params
 		-host::string='',
@@ -202,9 +223,9 @@ define ds => type{
 		.'dsinfo' = #dsinfo
 		
 		local(
-			active 	= ds_connections->find(#key),
 			dsinfo 	= .'dsinfo',
 			hostinfo,
+			store = true,
 			gb = givenblock
 		)
 	
@@ -213,37 +234,17 @@ define ds => type{
 
 		handle => { 
 			//	Set keycolumn info
-			.keycolumn = #keycolumn || .keycolumn	
+			.keycolumn = #keycolumn || .keycolumn
+			#store ? .store // Details only (connection unlikely)
 		}
-		 
-		if(#active) => { 
 		
-			//	Check for existing connection
-			.'capi' 	= #active->capi
+		if(.primed) => { 
 			
-			//	Ensure thread safe
-			//.'dsinfo' = #active->dsinfo//->makeinheritedcopy
-
-			local(d) = #active->dsinfo
-			
-			//.'dsinfo' = #active->dsinfo->makeinheritedcopy
-			#dsinfo->hostdatasource 	= #d->hostdatasource
-			#dsinfo->hostid 			= #d->hostid
-			#dsinfo->hostname 			= #d->hostname
-			#dsinfo->hostport 			= #d->hostport
-			#dsinfo->hostusername 		= #d->hostusername
-			#dsinfo->hostpassword 		= #d->hostpassword
-			#dsinfo->hosttableencoding 	= #d->hosttableencoding
-			#dsinfo->hostschema 		= #d->hostschema
-
-			#dsinfo->connection 		= #d->connection
-			#dsinfo->prepared 			= #d->prepared
-			#dsinfo->refobj 			= #d->refobj
+			// Reusing details + connection (if active)
+			#store = false 
 
 		else(#host)			
-	
 			//	Host specified, skip look up — fast
-	
 			#dsinfo->hostdatasource 	= #datasource
 			#dsinfo->hostid 			= 0
 			#dsinfo->hostname 			= #host
@@ -276,6 +277,8 @@ define ds => type{
 			#dsinfo->hosttableencoding 	= #hostinfo->get(8)||#encoding	
 
 			.'capi' = \#datasource
+		else 
+			#store = false 
 		}
 
 		//	Replace database and table (most likely the same unless key)
@@ -378,7 +381,7 @@ define ds => type{
 //-----------------------------------------------------------
 	
 	public sql(
-		statement::string,maxrows::integer = .dsinfo->maxrows || 50
+		statement::string,maxrows::integer = .dsinfo->maxrows || ds_default_maxrows
 	) => {
 		
 		//	Clear old results
@@ -393,16 +396,100 @@ define ds => type{
 		return .invoke => givenblock
 	}
 
-	private store => {
-		ds_connections->insert(.'key' = self)
+	public lazysql(statement::string) => {
+		.sql = #statement
+		return self
+	}
+	
+	public sql=(statement::string) => {
+		local(dsinfo) =.'dsinfo'
+		#dsinfo->action 	= lcapi_datasourceExecSQL
+		#dsinfo->statement 	= #statement
 	}
 
-	public close => {
-		.dsinfo->action = lcapi_datasourcetickle
-		.'capi'->invoke(.dsinfo)
+	private store => {
+		ds_connections->insert(.key = self)
+	}
 
-		.dsinfo->action = lcapi_datasourceCloseConnection
-		.'capi'->invoke(.dsinfo)
+	// Load Connection
+	// Connection could be stored but not active
+	// We still want to use the details (dsinfo)
+
+	// On invoke we must ensure we use an active connection
+
+	private primed => {
+	
+		local(
+			dsinfo = .dsinfo,
+			active = ds_connections->find(.key),
+			d
+		)
+
+		if(#active) => { 
+			#d = #active->dsinfo
+
+			//	Check for existing connection
+			.'capi' 	= #active->capi
+			
+			//	Ensure thread safe
+			#dsinfo->hostdatasource    = #d->hostdatasource
+			#dsinfo->hostid            = #d->hostid
+			#dsinfo->hostname          = #d->hostname
+			#dsinfo->hostport          = #d->hostport
+			#dsinfo->hostusername      = #d->hostusername
+			#dsinfo->hostpassword      = #d->hostpassword
+			#dsinfo->hosttableencoding = #d->hosttableencoding
+			#dsinfo->hostschema        = #d->hostschema
+
+			#dsinfo->connection = #d->connection
+			#dsinfo->prepared   = #d->prepared
+			#dsinfo->refobj     = #d->refobj
+
+			return true
+		}
+
+		return false 
+	}
+
+	private active => {
+		// Do nothing if has connection
+		 .dsinfo->connection ? return true
+
+		local(
+			dsinfo = .dsinfo,
+			active = ds_connections->find(.key),
+			d
+		)
+	
+		if(#active && #active->dsinfo->connection) => { 
+			#d = #active->dsinfo
+
+			//	Re use existing connection
+			.'capi'             = #active->capi
+			#dsinfo->connection = #d->connection
+			#dsinfo->prepared   = #d->prepared
+			#dsinfo->refobj     = #d->refobj
+
+			return true
+
+		}
+
+	}
+
+	public close(dsinfo::dsinfo = .dsinfo) => {
+		if(#dsinfo->connection) => {
+
+			#dsinfo->action = lcapi_datasourcetickle
+			.'capi'->invoke(#dsinfo)
+
+			#dsinfo->action = lcapi_datasourceCloseConnection
+			.'capi'->invoke(#dsinfo)
+
+			#dsinfo->connection = 0
+
+			// This is needed for thread support
+			.dsinfo = #dsinfo->makeinheritedcopy			
+		}
 	}
 	
 	public notyet => {
@@ -417,10 +504,10 @@ define ds => type{
 //
 //-----------------------------------------------------------	
 
-	public invoke => {
+	public invoke(dsinfo::dsinfo = .'dsinfo') => {
 	
 		//	Close connection when not web_request not ideal, but safe.
-		not web_request ? handle => {.close}
+		not web_request ? handle => {.close(#dsinfo)}
 		
 		//	Remove old results
 		.removeall
@@ -428,46 +515,61 @@ define ds => type{
 		local(
 			gb 		= givenblock,
 			capi 	= .'capi',
-			dsinfo 	= .'dsinfo',
 			results	= array,
-			s = 1,
-		
+			s = 1,		
 			set,
 			result,
 			error,
 			affected,
-			
+			keycolumns,
 			index,
 			cols,
 			col 
 		)
 	
 		fail_if(not #capi, 'No datasource: check -database, -table or -datasource')
-		
-		//	Store connection for re-use
-		.store
+
+		not .active ? .store 
 
 		protect => {
+
+			//	Ensure error stack is set
 			handle => {
-				//	shared error per request
+
+				//	Shared error per request
 				#error = (: error_code, error_msg, error_stack)
+
+				//	Restore keycolumn info
+				#dsinfo->keycolumns = #keycolumns
 				
+				//	Output errors		
 				if(error_code) => {
 					protect => {
 						debug(#dsinfo->statement)
 					}
-					stdoutnl('\nds error: '+error_msg+'\n')
+					stdoutnl('\nds error: ' + error_msg + '\n')
 				}
 			}
+			
+			// Store keycolumns for restore
+			#keycolumns = #dsinfo->keycolumns
+			
+			// Searches can not contain keycolumns (remove when null)
+			#dsinfo->action == lcapi_datasourcesearch && #keycolumns->size && #keycolumns->get(1)->get(3)->isa(::null) 
+			? #dsinfo->keycolumns = staticarray
+		
 			#result = #capi->invoke(#dsinfo)			
 			#result ? return #result
 		}
 		
-		#error->get(1) ? fail(#error->get(1),#error->get(2))
+		if(.silent) => {
+			error_code = #error->get(1)
+			error_msg = #error->get(2)
+			error_stack = #error->get(3) || ''
+		else
+			#error->get(1) ? fail(#error->get(1),#error->get(2),#error->get(3))			
+		}
 		
-		//! Set keycolumns now? Need by row for updates.
-		.keycolumn = .keycolumn
-				
 		{
 			#set = #dsinfo->getset(#s)
 			#affected = integer(var(::__updated_count__))
@@ -565,24 +667,87 @@ define ds => type{
 
 		return #col
 	}
-
 	public keycolumn(col::tag) => .keycolumn(#col->asstring)
 	public keycolumn(col::string) => {
 		.keycolumn = #col
 		return self
 	}
-	
-	private keyvalues => .keyvalues(.keycolumn = null)
-	private keyvalues(p::pair) => (:(:#p->name, lcapi_datasourceopeq,#p->value))
 
+//---------------------------------------------------------------------------------------
+//
+// 	Multiple key column support
+//
+//---------------------------------------------------------------------------------------	
+	
+	public keycolumns => {
+		.'dsinfo'->keycolumns->size
+		?	return (with key in .'dsinfo'->keycolumns select #key->get(1))->asstaticarray
+		|	return (:.'keycolumn')
+	}
+		
+	public keycolumns=(keycolumns::trait_foreach) => {
+		.'dsinfo'->keycolumns = (
+			with col in #keycolumns
+			select .keyvalue(#col = null)
+		)->asstaticarray
+		
+		return #keycolumns->asstaticarray
+	}
+
+	public keycolumns(key::string,...) => .keycolumns((with p in params select #p)->asstaticarray)
+	public keycolumns(key::tag,...) => .keycolumns((with p in params select #p->asstring)->asstaticarray)
+	
+	public keycolumns(keycolumns::trait_foreach) => {
+		.keycolumns = #keycolumns
+		return self
+	}
+	
+//---------------------------------------------------------------------------------------
+//
+// 	key value wrappers
+//
+//---------------------------------------------------------------------------------------	
+
+	private keyvalues => .keyvalues(.keycolumns)
+	
+	private keyvalues(p::pair,...) 	=> .keyvalues(params)	
+	private keyvalues(p::integer) 	=> .keyvalues(.keycolumn = #p)
+	private keyvalues(p::string) 	=> .keyvalues(.keycolumn = #p)
+
+	private keyvalues(keys::trait_keyedforeach) => {
+		return (with p in #keys->eachpair select .keyvalue(#p))->asstaticarray
+	}
+
+	private keyvalues(keys::trait_foreach) => {
+		return (with p in #keys select .keyvalue(#p))->asstaticarray
+	}
+	
+	private keyvalue(p::string) => (:#p, lcapi_datasourceopeq,null)
+	private keyvalue(p::tag) => (:#p->asstring, lcapi_datasourceopeq,null)
+	private keyvalue(p::pair) => (:#p->name, lcapi_datasourceopeq,.filterinput(#p->value))
+
+//---------------------------------------------------------------------------------------
+//
+// 	input column wrapper 
+//
+//---------------------------------------------------------------------------------------	
+	
 	private inputcolumns(p::trait_foreach) => {
 		local(input) = array
 
 		#p->foreach => {
-			#input->insert((:#1->first, 0, #1->second))
+			#input->insert((:#1->first, lcapi_datasourceopeq, .filterinput(#1->second)))
 		}
 		return #input->asstaticarray			
 	}	
+
+	private filterinput(p::integer) => #p
+	private filterinput(p::decimal) => #p
+	private filterinput(p::string)  => #p
+	private filterinput(p::bytes)   => #p
+	private filterinput(p::null)    => #p
+	private filterinput(p::void)    => null
+	private filterinput(p::any)     => #p->asstring 
 
 //---------------------------------------------------------------------------------------
 //
@@ -601,6 +766,7 @@ define ds => type{
 		return .invoke->last
 	}
 	
+	public statement	=> .dsinfo->statement
 	public datasource	=> .dsinfo->hostdatasource
 	public database 	=> .dsinfo->databasename
 	public table 		=> .dsinfo->tablename
@@ -617,15 +783,21 @@ define ds => type{
 		return self
 	}
 
+	public silent(shouldprotect::boolean) => {
+		.silent = #shouldprotect
+		return self
+	}
+
 	public maxrows => .dsinfo->maxrows
 	public maxrows(max::integer) => {
 		.dsinfo->maxrows = #max
 		return self
 	}
 
+	public all             => .maxrows(-1)
+
 	public affected => .'results'->size ? .'results'->last->affected | 0
 	public found	=> .'results'->size ? .'results'->last->found | 0
-	
 	
 //---------------------------------------------------------------------------------------
 //
@@ -642,28 +814,55 @@ define ds => type{
 	) => {
 
 		//	New dsinfo
-		.dsinfo = .dsinfo->makeinheritedcopy
+		local(
+			d = .'dsinfo',
+			dsinfo = dsinfo
+		)
 
+		#dsinfo->databasename = #d->databasename
+		#dsinfo->tablename    = #d->tablename
+		#dsinfo->maxrows      = #d->maxrows
+
+		#dsinfo->hostdatasource    = #d->hostdatasource
+		#dsinfo->hostid            = #d->hostid
+		#dsinfo->hostname          = #d->hostname
+		#dsinfo->hostport          = #d->hostport
+		#dsinfo->hostusername      = #d->hostusername
+		#dsinfo->hostpassword      = #d->hostpassword
+		#dsinfo->hosttableencoding = #d->hosttableencoding
+		#dsinfo->hostschema        = #d->hostschema
+
+		#dsinfo->connection = #d->connection
+		#dsinfo->prepared   = #d->prepared
+		#dsinfo->refobj     = #d->refobj
+		
 		//	Determine action
 		match(#action) => {
-			case(::add)		.dsinfo->action = lcapi_datasourceadd
-			case(::update)	.dsinfo->action = lcapi_datasourceupdate
-			case(::delete)	.dsinfo->action = lcapi_datasourcedelete
+			case(::add)		#dsinfo->action = lcapi_datasourceadd
+			case(::update)	#dsinfo->action = lcapi_datasourceupdate
+			case(::search)	#dsinfo->action = lcapi_datasourcesearch
+			case(::delete)	#dsinfo->action = lcapi_datasourcedelete
 			case return self
 		}
 		
 		//	Set values
-		.dsinfo->tablename 		= #table
-		.dsinfo->keycolumns 	= (#keyvalues->size ? #keyvalues | .keyvalues)
-		.dsinfo->inputcolumns 	= .inputcolumns(#values)
-		
-		//!debug('update keys' = .dsinfo->keycolumns)
-		//!debug('update input' = .dsinfo->inputcolumns)
-		
-		local(out) = .invoke => givenblock 
-				
+		#dsinfo->tablename 		= #table
+		#dsinfo->keycolumns 	= (#keyvalues->size ? #keyvalues | .keyvalues)
+		#dsinfo->inputcolumns 	= .inputcolumns(#values)
+
+		handle => {
+			if(!#d->connection && #dsinfo->connection) => {
+				#d->connection 	= #dsinfo->connection
+				#d->prepared 	= #dsinfo->prepared
+				#d->refobj 		= #dsinfo->refobj			
+			}
+			#d->statement = #dsinfo->statement 
+		}
+
+		local(out) = .invoke(#dsinfo) => givenblock 
+
 		return #firstrow ? .firstrow | #out
-	}
+	} 
 
 //---------------------------------------------------------------------------------------
 //
@@ -671,8 +870,10 @@ define ds => type{
 //
 //---------------------------------------------------------------------------------------
 
-	public addrow(p::pair,...) => .execute(::add,.table,staticarray,params,true) => givenblock
+	public addrow(p::pair,...)           => .execute(::add,.table,staticarray,params,true) => givenblock
 	public addrow(p::trait_keyedforeach) => .execute(::add,.table,staticarray,#p->eachpair->asstaticarray,true) => givenblock
+	public addrow(p::trait_foreach)      => .execute(::add,.table,staticarray,#p->asstaticarray,true) => givenblock
+	public addrow(data::staticarray)     => .execute(::add,.table,staticarray,#data,true) => givenblock
 
 	public addrow(totable::string,data::trait_keyedforeach) => .execute(::add,
 		#totable,
@@ -704,17 +905,39 @@ define ds => type{
 		#row->modified_data->eachpair->asstaticarray
 	) => givenblock
 
-	public updaterow(table::string,data::trait_keyedforeach,id::integer) => .execute(::update,
+	public updaterow(table::tag,data::trait_keyedforeach,key::any) => .updaterow(#table->asstring,#data,#key)
+
+	public updaterow(table::string,data::trait_keyedforeach,key::any) => .execute(::update,
 		#table,
-		.keyvalues(.keycolumn=#id),
+		.keyvalues(#key),
 		#data->eachpair->asstaticarray
 	) => givenblock
 
-	public updaterow(table::string,data::trait_keyedforeach,id::integer) => .execute(::update,
-		#table,
-		.keyvalues(#id),
+	public updaterow(table::string, data::trait_positionallykeyed, key::any) => .execute(::update, 
+		#table, 
+		.keyvalues(#key), 
+		#data
+	) => givenblock
+ 
+ 	public updaterow(table::tag, data::trait_positionallykeyed, key::any) => .execute(::update, 
+ 		#table->asstring, 
+ 		.keyvalues(#key), 
+ 		#data
+ 	) => givenblock
+ 
+	public updaterow(data::trait_keyedforeach,key::pair,...) => .execute(::update,
+		.table,
+		.keyvalues(tie((:#key), #rest || staticarray)->asstaticarray),
 		#data->eachpair->asstaticarray
 	) => givenblock
+
+	public updaterow(data::trait_keyedforeach,key::any) => .execute(::update,
+		.table,
+		.keyvalues(#key),
+		#data->eachpair->asstaticarray
+	) => givenblock
+
+	public updaterows(...) => .updaterow(: #rest || staticarray) 
 
 //---------------------------------------------------------------------------------------
 //
@@ -724,13 +947,21 @@ define ds => type{
 
 	public delete(row::ds_row) => .execute(::delete,#row->table,#row->keyvalues,staticarray) => givenblock
 
-	public deleterow(keyvalue::integer)	=> .execute(::delete,.table,.keyvalues(.keycolumn=#keyvalue),staticarray) => givenblock
-	public deleterow(keyvalue::string)	=> .execute(::delete,.table,.keyvalues(.keycolumn=#keyvalue),staticarray) => givenblock
+	public deleterow(keyvalue::integer) => .execute(::delete,.table,.keyvalues(.keycolumn=#keyvalue),staticarray) => givenblock
+	public deleterow(keyvalue::string)  => .execute(::delete,.table,.keyvalues(.keycolumn=#keyvalue),staticarray) => givenblock
+	public deleterow(keypair::pair,...) => .execute(::delete,.table,.keyvalues(tie((:#keypair), #rest || staticarray)->asstaticarray),staticarray) => givenblock
 
-	public deleterow(fromtable::string,keyvalue::integer) => .execute(::delete,#fromtable,.keyvalues(.keycolumn=#keyvalue)) => givenblock
-	public deleterow(fromtable::string,keyvalue::string) => .execute(::delete,#fromtable,.keyvalues(.keycolumn=#keyvalue)) => givenblock
-	public deleterow(fromtable::string,key::pair) => .execute(::delete,#fromtable,.keyvalues(#key)) => givenblock
-	public deleterow(fromtable::string,keyvalues::staticarray) => .execute(::delete,#fromtable,#keyvalues) => givenblock
+	public deleterow(fromtable::string,keyvalue::integer)      => .execute(::delete,#fromtable,.keyvalues(.keycolumn=#keyvalue),staticarray) => givenblock
+	public deleterow(fromtable::string,keyvalue::string)       => .execute(::delete,#fromtable,.keyvalues(.keycolumn=#keyvalue),staticarray) => givenblock
+	public deleterow(fromtable::string,keypair::pair,...)      => .execute(::delete,#fromtable,.keyvalues(tie((:#keypair), #rest || staticarray)->asstaticarray),staticarray) => givenblock
+	public deleterow(fromtable::string,keyvalues::staticarray) => .execute(::delete,#fromtable,#keyvalues,staticarray) => givenblock
+
+	public deleterow(fromtable::tag,keyvalue::integer)      => .deleterow(#fromtable->asstring,#keyvalue) => givenblock
+	public deleterow(fromtable::tag,keyvalue::string)       => .deleterow(#fromtable->asstring,#keyvalue) => givenblock
+	public deleterow(fromtable::tag,keypair::pair,...)      => .deleterow(#fromtable->asstring,.keyvalues(tie((:#keypair), #rest || staticarray)->asstaticarray)) => givenblock
+	public deleterow(fromtable::tag,keyvalues::staticarray) => .deleterow(#fromtable->asstring,#keyvalues) => givenblock
+
+	public deleterows(keypair::pair,...) => .deleterow(:params)
 
 //---------------------------------------------------------------------------------------
 //
@@ -740,27 +971,46 @@ define ds => type{
 
 	public blankrow => ds_row(map,staticarray,staticarray,.dsinfo)
 
-	public getrow(keyvalue) 					=> .getfrom(.table,#keyvalue)->first
+	public getrow(keyvalue::integer)  => .getrow(.keycolumn = #keyvalue)
+	public getrow(keyvalue::string)   => .getrow(.keycolumn = #keyvalue)
+	public getrow(keyvalue::pair,...) => .execute(::search,
+		.table,
+		staticarray,
+		tie((:#keyvalue), #rest || staticarray)->asstaticarray,
+		true 
+	)
 
-	public getrows(keyvalue,...) 				=> .getfrom(.table,params)
-	public getrows(keyvalues::trait_foreach) 	=> .getfrom(.table,#keyvalues)
+	public getrows(keyvalue,...)               => .getfrom(.table,params)
+	public getrows(keyvalue::pair,p::pair,...) => .getfrom(.table,params)
+	public getrows(keyvalues::trait_foreach)   => .getfrom(.table,#keyvalues)
 
-	public getfrom(table::string,keyvalue::string) 			=> .search(#table,.keyvalues(.keycolumn=#keyvalue))->rows
-	public getfrom(table::string,keyvalue::integer) 		=> .search(#table,.keyvalues(.keycolumn=#keyvalue))->rows
-	public getfrom(table::string,key::pair) 				=> .search(#table,.keyvalues(#key))->rows
-	public getfrom(table::string,keyvalues::trait_foreach) 	=> {
-		
+	public getfrom(table::tag,keyvalue::any)        => .getfrom(#table->asstring,#keyvalue)
+	public getfrom(table::string,keyvalue::string)  => .execute(::search,#table,.keyvalues(.keycolumn=#keyvalue),staticarray)->rows
+	public getfrom(table::string,keyvalue::integer) => .execute(::search,#table,.keyvalues(.keycolumn=#keyvalue),staticarray)->rows
+	public getfrom(table::string,key::pair)         => .execute(::search,#table,.keyvalues(#key),staticarray)->rows
+
+	public getfrom(table::string,keyvalues::trait_foreach) 	=> {		
 		local(
-			params = array(#table,-opbegin='or',-op='eq')
+			matchall = false,
+			params = array(
+				-table = #table,
+				-op = 'eq'
+			)
 		)
-		
+
 		with p in #keyvalues do {
-			#p->isa(::pair)			
-			? #params->insert(#p)
-			| #params->insert(.keycolumn = #p)
+			match(#p->type) => {
+				case(::pair,::keyword)
+					#params->insert(#p)		
+				case(::boolean)
+					#p ? #matchall = true
+				case
+					#params->insert(.keycolumn = #p)	
+			}
 		}
-		// This needs 
-		retun .search(:#params->asstaticarray)->rows
+		not #matchall ? #params->insert(-opbegin = 'or',1)
+
+		return .search(:#params->asstaticarray)->rows
 		
 	}
 
@@ -775,21 +1025,20 @@ define ds => type{
 	
 	public search(...) => {
 		.dsinfo->extend(:#rest || staticarray)
-		.dsinfo->action = lcapi_datasourcesearch
-		.keycolumn = ''		
+		.dsinfo->action = lcapi_datasourcesearch	
 		local(r) = .invoke => givenblock	
 		return #r
 	}
 
-	public all(maxrows::integer=-1) => {
+	public findrows(...) => .search(:#rest || staticarray)->rows
+
+	public findall(maxrows::integer=-1) => {
 		.dsinfo->maxrows = #maxrows
 		.dsinfo->action = lcapi_datasourcefindall
 		return .invoke => givenblock		
 	}
 
-	public findrows(...) => .search(:#rest || staticarray)->rows
-
-	public allrows(maxrows::integer=-1) => .all(#maxrows)->rows
+	public allrows(maxrows::integer=-1) => .findall(#maxrows)->rows
 
 
 //---------------------------------------------------------------------------------------
@@ -809,27 +1058,52 @@ define ds => type{
 	public lastrow(col::string) => .last->rows->last->find(#col)
 	public lastrow(col::tag) 	=> .last->rows->last->find(#col->asstring)
 
-	public rows => (.first->rows => givenblock) || staticarray
-	public rows(type::tag) => (.first->rows(#type) => givenblock) || staticarray
+	public rows                        => (.first->rows 		=> givenblock) || staticarray
+	public rows(type::tag)             => (.first->rows(#type) => givenblock) || staticarray
+	public rows(creator::memberstream) => (.first->rows(#creator) => givenblock) || staticarray
 
+//---------------------------------------------------------------------------------------
+//
+// 	No output as string
+//
+//---------------------------------------------------------------------------------------
+
+	public asstring => ''
+	
 //---------------------------------------------------------------------------------------
 //
 // 	SQL constructors
 //
 //---------------------------------------------------------------------------------------
 
-	public select(...) 	=> select_statement(self)->select(:#rest || staticarray) => givenblock
-	public where(...) 	=> select_statement(self)->where(:#rest || staticarray) => givenblock
-	public insert(...)	=> insert_statement(self) => givenblock
-	public update(...)	=> update_statement(self)->set(:#rest || staticarray) => givenblock
+	public select_statement => select_statement(self) => givenblock
+	public insert_statement => insert_statement(self) => givenblock
+	public update_statement => update_statement(self) => givenblock
 
-	public insertinto(table::string,row::map,update::boolean=false)	=> insert_statement(self)->into(#table)
+	public select(...) => .select_statement->select(:#rest || staticarray('*')) => givenblock
+	public where(...)  => .select_statement->where(:#rest || staticarray) => givenblock
+	public insert(...) => .insert_statement => givenblock
+
+	public insert(table::tag,...columns)                => .insert_statement->into(#table,#columns) => givenblock
+	public insert(table::string,...columns)             => .insert_statement->into(#table,#columns) => givenblock
+	public insert(table::tag,columns::trait_foreach)    => .insert_statement->into(#table,#columns) => givenblock
+	public insert(table::string,columns::trait_foreach) => .insert_statement->into(#table,#columns) => givenblock
+
+	public update(table::tag,...where)                => .update_statement->update(#table,#where) => givenblock
+	public update(table::string,...where)             => .update_statement->update(#table,#where) => givenblock
+	public update(table::tag,where::trait_foreach)    => .update_statement->update(#table,#where) => givenblock
+	public update(table::string,where::trait_foreach) => .update_statement->update(#table,#where) => givenblock
+
+	public update(...) => .update_statement->set(:#rest || staticarray) => givenblock
+	public set(...)    => .update_statement->set(:#rest || staticarray) => givenblock
+
+	public insertinto(table::string,row::map,update::boolean=false)	=> .insert_statement->into(#table)
 																			->columns(#row->keys)
 																			->onduplicate(#update)
-																			->addrow(#row) => (givenblock || true)
+																			->addrow(#row) => (givenblock || {})
 
 	public updaterowin(table::string,row::map,keyvalue::any) => .update(self)->set(#row->keys)
-																->where(.keycolumn = #keyvalue) => (givenblock || true)
+																->where(.keycolumn = #keyvalue) => (givenblock || {})
 
 }
 
@@ -843,7 +1117,7 @@ define ds => type{
 //---------------------------------------------------------------------------------------
 
 define dsinline(...) => {
-	return ds(dsinfo->extend(:#rest || staticarray),true,params) => givenblock	
+	ds(dsinfo->extend(:#rest || staticarray),true,params)->silent(true)->invoke => givenblock	
 }
 
 define dsinfo->extend(...) => {
@@ -878,7 +1152,6 @@ define dsinfo->extend(...) => {
 					?	#keycolumns->last->get(3) = #val
 					|	#keycolumns->insert((:null,lcapi_datasourceopeq,#val))
 				case('keycolumn','keyfield')
-					.keycolumn = #val
 					#keycolumns->size 
 					?	#keycolumns->last->get(1) = #val
 					|	#keycolumns->insert((:#val,lcapi_datasourceopeq,null))						
@@ -895,8 +1168,8 @@ define dsinfo->extend(...) => {
 				case('host')
 					#val->isa(::array)
 					? #val->foreach => {
-						#1->isa(::pair) && #val := #1->value
-						? match(#p->name) => {
+						#1->isanyof(::keyword,::pair) && #val := #1->value
+						? match(#1->name) => {
 							case('datasource')
 								#dsinfo->hostdatasource 	= #val
 							case('name')
@@ -934,6 +1207,9 @@ define dsinfo->extend(...) => {
 					#dsinfo->action = lcapi_datasourceinfo
 				case('statementonly')
 					#dsinfo->statementonly = true
+				case('sql')
+					#dsinfo->statement 	= #val
+					#dsinfo->action 	= lcapi_datasourceExecSQL
 				case('prepare')
 					#dsinfo->statement 	= #val
 					#dsinfo->action 	= lcapi_datasourcepreparesql
@@ -979,7 +1255,9 @@ define dsinfo->extend(...) => {
 					}
 			}
 		else(#p->isa(::pair))
-			#columns->insert((:#p->name,#op,#p->value))
+			#columns->insert(
+				(:#p->name,#op,#p->value->isa(::date) ? #p->value->asstring | #p->value)
+			)
 		}
 	}
 	
@@ -991,6 +1269,5 @@ define dsinfo->extend(...) => {
 	return #dsinfo
 	
 }
-
 
 ?>
