@@ -59,9 +59,9 @@ define slapcode_type => type {
 
 	public oncreate => {
 		//	Start session
-		.project_id = integer(client_postparam('project_id'))
-		.client_id = integer(client_postparam('client_id'))
-		.user_id = integer(client_postparam('user_id'))		
+		.project_id = client_postparam('project_id')->asinteger
+		.client_id  = client_postparam('client_id')->asinteger
+		.user_id    = client_postparam('user_id')->asinteger
 		
 	}
 	
@@ -131,7 +131,8 @@ define slapcode_type => type {
 			code = client_postparam('code')->asstring,
 			task = web_request->param('task')->asstring,
 			
-			project_name = client_postparam('project_name')->asstring
+			project_name = client_postparam('project_name')->asstring,
+			project
 
 		)
 		
@@ -165,18 +166,17 @@ define slapcode_type => type {
 			case('close')
 				.update('code',map('isopen'=0),#id)
 				return .current_result
-				
-				
+					
 			case('saveproject')
-				#project_id = .insert('projects',map('name'=#project_name),#project_id || null)
-				
+				#project 	= .save('projects',#project_id,'name' = #project_name)
+				#project_id = #project->keyvalue
 				#out->insert(
-					'project' = .load('projects',#project_id)
+					'project' = #project->asmap
 				)
 				return .current_result
 
 			case('save')			
-				.save(#id,#name,#code)
+				.savecode(#id,#name,#code)
 				return .current_result
 			case('projects')
 				#out->insert('projects'=.projects)
@@ -192,7 +192,7 @@ define slapcode_type => type {
 				.run(#code)
 				
 				#out->insert(
-					'id' = .save(#id,#name,#code)->keyvalue 
+					'id' = .savecode(#id,#name,#code)->keyvalue 
 				)
 				
 				return .current_result
@@ -400,15 +400,6 @@ define slapcode_type => type {
 			}
 			
 			//debug(string_replaceregexp(#x,-find=`=>\s\{`,-replace='=> debug => {'))
-			
-			//debug->activate;
-			
-			//debug(string_replaceregexp(#code,-find=`=>\s\{`,-replace='=> slap => {'))
-			//debug(string_replaceregexp(#code,-find=`([\.\-\>\w]+\(.*?\))(?!>=)`,-replace=`slap(\1)`))
-			
-			// void
-
-			//debug(#code)
 
 			debug('Compiling code') => {
 				.compiled = sourcefile(#code,'slapcode: '+#name,true,false)
@@ -500,7 +491,7 @@ define slapcode_type => type {
 		return #out
 	}
 
-	public save(
+	public savecode(
 		id::any,
 		name::string,
 		code::string
@@ -511,19 +502,8 @@ define slapcode_type => type {
 			now  = date->format('%q')
 		)
 
-		debug('save id' = #id)
-		debug('name id' = #name)
-		debug('isnew' = #row->isnew)
 		// Add created date if new
 		! #id ? #row->updatedata('created' = #now)
-
-		protect => {
-
-			handle => {
-				debug('id'        = #id)
-				debug('name'      = #name)
-				debug('error_msg' = error_msg)
-			}
 
 			return #row->save(
 				'project_id'= .project_id,
@@ -533,16 +513,18 @@ define slapcode_type => type {
 				'modified' 	= #now,
 				'isopen'	= 1
 			)
-		
-
-		}
-
 
 	}
 
 	public insert(table::string,row::map,id::any) => {
 		#row->insert('id'=#id)		
-		.ds->addrow(#table,#row,true) => {}	
+		.ds->addrow(#table,#row) => {}	
+	}
+
+	public save(table::string,id::any, ...values) => {
+		local(row) = activerow(.ds->table(#table),#id)
+		#row->save(:#values)
+		return #row
 	}
 	
 	public update(table::string,row::map,id::integer) => {

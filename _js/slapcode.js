@@ -5,14 +5,7 @@ var slapcode = {
 		if(!slapcode.initialised){
 			slapcode.initialised=true
 
-			//	Extend code mirror
-			/*
-			CodeMirror.wrap = function(cm,char,close){
-				var pos = cm.getCursor();
-				cm.replaceSelection(char+close)
-				cm.setSelection({line: pos.line, ch: pos.ch + 1}, {line: pos.line, ch: pos.ch + 1});
-			}*/
-			
+			// Register Editor 
 			$('form.code').not('registered').each(function(){
 				slapcode.registereditor($(this))
 			}) 
@@ -25,21 +18,10 @@ var slapcode = {
 					return url.indexOf("#") == -1 || slapcode.click(p + url) 
 				})
 			})
-			
 
-			
-			// Bind run
-			/*
-			$('div.openfile button:contains("Run")').unbind().click(function(){
-				slapcode.submit()
-				
-			})*/
-	
+			// Bind rename project
+			$('.navbar .brand').dblclick(slapcode.project_rename)
 
-			$('a.btn-large:contains("Create tables")').unbind().click(function(){
-				alert('cr')
-			})	
-			
 			slapcode.bindkeys(document)
 			slapcode.load()			
 		}
@@ -212,7 +194,7 @@ var slapcode = {
 	},
 
 	refreshprojects: function(){
-		slapcode.getprojects(false,function(r){
+		slapcode.getprojects(function(r){
 			//	Populate files
 			if(r.projects) slapcode.projects = r.projects
 		})
@@ -545,8 +527,8 @@ var slapcode = {
 					
 		slapcode.prompt_with_input('New project...',n,n,function(newname){
 			p.name = newname
+			slapcode.project.id = 0
 			slapcode.saveproject(function(r){
-				//console.log(["new project",r.project])
 				slapcode.project = r.project
 				slapcode.load()
 			})
@@ -603,8 +585,6 @@ var slapcode = {
 	file_save: function(){
 		var t = slapcode.tab 
 		
-		//console.log(t)
-		
 		if(!t.id){
 			slapcode.file_saveas()
 		} else {
@@ -619,7 +599,7 @@ var slapcode = {
 	file_close: function(){
 		slapcode.closetab(slapcode.tab)
 	}
-		
+
 }
 
 $(document).ready(slapcode.setup)
