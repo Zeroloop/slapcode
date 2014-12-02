@@ -19,10 +19,11 @@ define activerow => type {
 		public row,
 				
 		// allow support for basic preferences
-		public created_column 	= activerow_default_created_column,
-		public modified_column 	= activerow_default_modified_column,
+		public created_column   = activerow_default_created_column,
+		public modified_column  = activerow_default_modified_column,
 		public timestamp_format = activerow_default_timestamp_format,
-		public generate_uuid	= false
+		public timestamp_utc    = false,
+		public generate_uuid    = false
 
 //---------------------------------------------------------------------------------------
 //
@@ -112,11 +113,12 @@ define activerow => type {
 //
 //---------------------------------------------------------------------------------------
 
-	public id 		=> .row->keyvalue
+	public id       => .row->keyvalue
 	public keyvalue => .row->keyvalue
-	public created	=> .creation_column		? self(.creation_column)
-	public modified => .modification_column	? self(.modification_column)
-	public columns	=> {
+	public created  => .created_column		? .find(.created_column)
+	public modified => .modified_column		? .find(.modified_column)
+
+	public columns  => {
 		local(cols) = .row->columns
 		
 		#cols->size ? return #cols
@@ -257,25 +259,28 @@ define activerow => type {
 	public create => {
 		local(
 			row = .row,
+			now = date,
 			key 
 		)
 		
 		//	Should we create a row when no data? — it should probably cause an error
-
 		.generate_uuid ? #row->insert(
 			.keycolumn = lasso_uniqueid
 		)
+
+		//	Check if should use UTC
+		.timestamp_utc ? #now->timezone = 'UTC'
 
 		#key = .find(.keycolumn)
 
 		// Add timestamp when column specified
 		.created_column ? #row->insert(
-			.created_column = date->format(.timestamp_format)
+			.created_column = #now->format(.timestamp_format)
 		)
 
 		// Add timestamp when column specified
 		.modified_column ? #row->insert(
-			.modified_column = date->format(.timestamp_format)
+			.modified_column = #now->format(.timestamp_format)
 		)
 		
 		//	Allow for empty rows insert would normally fail if no data supplied 
@@ -299,6 +304,11 @@ define activerow => type {
 // 	Save modified data
 //
 //---------------------------------------------------------------------------------------
+
+	public save(data::trait_keyedForEach) => {
+		.updatedata(#data)
+		return .save 
+	}
 
 	public save(pair::pair,...) => {
 		.updatedata(:params)
