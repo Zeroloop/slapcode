@@ -59,9 +59,9 @@ define slapcode_type => type {
 
 	public oncreate => {
 		//	Start session
-		.project_id = client_postparam('project_id')->asinteger
-		.client_id  = client_postparam('client_id')->asinteger
-		.user_id    = client_postparam('user_id')->asinteger
+		.project_id = web_request->postparam('project_id')->asinteger
+		.client_id  = web_request->postparam('client_id')->asinteger
+		.user_id    = web_request->postparam('user_id')->asinteger
 		
 	}
 	
@@ -122,16 +122,16 @@ define slapcode_type => type {
 		local(
 			out = .output,
 
-			id = integer(client_postparam('id')) || null,
+			id = integer(web_request->postparam('id')) || null,
 			project_id = .project_id,
 			client_id = .client_id,
 			user_id = .user_id,
 
-			name = client_postparam('name')->asstring,
-			code = client_postparam('code')->asstring,
+			name = web_request->postparam('name')->asstring,
+			code = web_request->postparam('code')->asstring,
 			task = web_request->param('task')->asstring,
 			
-			project_name = client_postparam('project_name')->asstring,
+			project_name = web_request->postparam('project_name')->asstring,
 			project
 
 		)
