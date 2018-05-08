@@ -249,11 +249,11 @@ define slapcode_type => type {
 		#sql->append(
 			'CREATE TABLE IF NOT EXISTS `projects` (
 				`ID` bigint(20) NOT NULL AUTO_INCREMENT,
-				`created` datetime NOT NULL,
-				`modified` datetime NOT NULL,
-				`user_id` bigint(20) NOT NULL,
-				`client_id` bigint(20) NOT NULL,
-				`name` VARCHAR(128) NOT NULL DEFAULT "",
+				`created` datetime DEFAULT NULL,
+				`modified` datetime DEFAULT NULL,
+				`user_id` bigint(20) DEFAULT 0,
+				`client_id` bigint(20) DEFAULT 0,
+				`name` varchar(128) DEFAULT '',
 				`code` text,
 				PRIMARY KEY (`ID`)
 			) AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;\n'
@@ -262,13 +262,12 @@ define slapcode_type => type {
 		#sql->append(
 			'CREATE TABLE IF NOT EXISTS `code` (
 				`ID` bigint(20) NOT NULL AUTO_INCREMENT,
-				`created` datetime NOT NULL,
-				`modified` datetime NOT NULL,
-				`project_id` bigint(20) NOT NULL,
-				`user_id` bigint(20) NOT NULL,
+				`created` datetime DEFAULT NULL,
+				`modified` datetime DEFAULT NULL,
+				`project_id` bigint(20) DEFAULT 0,
+				`user_id` bigint(20) NOT NULL DEFAULT 0,
 				`name` VARCHAR(64) NOT NULL,
-				`isopen` tinyint(2) NOT NULL default 1,
-			
+				`isopen` tinyint(2) NOT NULL DEFAULT 1,
 				`code` text,
 				PRIMARY KEY (`ID`),
 				UNIQUE KEY `project_key` (`project_id`,`name`)
