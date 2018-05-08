@@ -253,7 +253,7 @@ define slapcode_type => type {
 				`modified` datetime DEFAULT NULL,
 				`user_id` bigint(20) DEFAULT 0,
 				`client_id` bigint(20) DEFAULT 0,
-				`name` varchar(128) DEFAULT '',
+				`name` varchar(128) DEFAULT "",
 				`code` text,
 				PRIMARY KEY (`ID`)
 			) AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;\n'
@@ -267,7 +267,8 @@ define slapcode_type => type {
 				`project_id` bigint(20) DEFAULT 0,
 				`user_id` bigint(20) NOT NULL DEFAULT 0,
 				`name` VARCHAR(64) NOT NULL,
-				`isopen` tinyint(2) NOT NULL DEFAULT 1,
+				`isopen` tinyint(2) NOT NULL default 1,
+			
 				`code` text,
 				PRIMARY KEY (`ID`),
 				UNIQUE KEY `project_key` (`project_id`,`name`)
