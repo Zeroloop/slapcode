@@ -10,7 +10,7 @@ if(not ::slapcode_type->istype)=> {
 
 // MySQL Connections only (local host recommeneded)
 
-slapcode_host 		= '127.0.0.1'
+slapcode_host 		= sys_getenv('DS_HOST') || '127.0.0.1'
 slapcode_database 	= 'slapcode'
 slapcode_username 	= 'root'
 slapcode_password 	= ''
